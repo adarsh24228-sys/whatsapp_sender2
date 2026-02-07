@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SimplifiedMinds WhatsApp Sender</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #f4f6f8; padding: 20px; max-width: 900px; margin: auto; }
+        h1 { text-align: center; color: #c90909; }
+        .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #fff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        select, button { padding: 10px 16px; border-radius: 8px; border: 1px solid #ccc; cursor: pointer; font-weight: bold; }
+        button { background: #c90909; color: #fff; border: none; }
+        button:hover { opacity: 0.8; }
+        .card { background: #fff; padding: 20px; margin-bottom: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .name { font-size: 1.2rem; font-weight: bold; color: #333; }
+        .meta { font-size: 13px; color: #666; margin: 5px 0; }
+        textarea { width: 100%; height: 220px; margin-top: 10px; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 14px; box-sizing: border-box; }
+        .wa { background: #25d366; color: white; width: 100%; margin-top: 15px; font-size: 16px; }
+        .load { display: block; margin: 20px auto; background: #444; }
+        .empty { text-align: center; padding: 50px; color: #888; }
+    </style>
+</head>
+<body>
+
+<h1>📨 SimplifiedMinds Sender</h1>
+
+<div class="top">
+    <select id="status">
+        <option value="PENDING">Pending Messages</option>
+        <option value="SENT">Sent History</option>
+        <option value="ALL">All Contacts</option>
+    </select>
+    <div>
+        <button onclick="setLimit(10)">Show 10</button>
+        <button onclick="setLimit(50)">Show 50</button>
+    </div>
+</div>
+
+<div id="container"></div>
+<button id="loadBtn" class="load" onclick="loadNext()">Load More</button>
+
+<script>
+const API = "https://whatsapp-sender.onrender.com/api/contacts";
+const MARK = "http://localhost:5000/api/mark-sent";
+
+let all = [];
+let page = 0;
+let limit = 10;
+
+async function fetchContacts() {
+    const status = document.getElementById("status").value;
+    const container = document.getElementById("container");
+    container.innerHTML = "<p style='text-align:center'>Fetching students and generating AI advice...</p>";
+    
+    try {
+        const res = await fetch(`${API}?status=${status}`);
+        const data = await res.json();
+        all = data.contacts || [];
+        page = 0;
+        container.innerHTML = "";
+        loadNext();
+    } catch (e) { 
+        container.innerHTML = "<p style='color:red; text-align:center'>Server Error! Is your backend running?</p>";
+    }
+}
+
+function setLimit(n) { limit = n; page = 0; document.getElementById("container").innerHTML = ""; loadNext(); }
+
+function loadNext() {
+    const start = page * limit;
+    const end = start + limit;
+    const batch = all.slice(start, end);
+    const container = document.getElementById("container");
+
+    if (batch.length === 0 && page === 0) {
+        container.innerHTML = `<div class="empty">No records found for this status.</div>`;
+        document.getElementById("loadBtn").style.display = "none";
+        return;
+    }
+
+    batch.forEach(c => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.id = `row-${c.rowNumber}`;
+        card.innerHTML = `
+            <div class="name">${c.name}</div>
+            <div class="meta">Row ${c.rowNumber} | 📞 ${c.number}</div>
+            <textarea id="msg-${c.rowNumber}">${c.message}</textarea>
+            <button class="wa" onclick="sendWhatsApp(${c.rowNumber}, '${c.number}')">Send to WhatsApp</button>
+        `;
+        container.appendChild(card);
+    });
+
+    page++;
+    document.getElementById("loadBtn").style.display = end >= all.length ? "none" : "block";
+}
+
+async function sendWhatsApp(row, phone) {
+    const msg = document.getElementById(`msg-${row}`).value;
+    const cleanPhone = phone.replace(/\D/g, "");
+    const url = `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(msg)}`;
+    
+    // 1. Open WhatsApp
+    window.open(url, "_blank");
+
+    // 2. Mark as sent in Sheets
+    try {
+        await fetch(MARK, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rowNumber: row })
+        });
+
+        // 3. Remove from UI if we are in PENDING view
+        if (document.getElementById("status").value === "PENDING") {
+            const card = document.getElementById(`row-${row}`);
+            card.style.transition = "0.5s";
+            card.style.opacity = "0";
+            setTimeout(() => card.remove(), 500);
+        }
+    } catch (e) {
+        alert("Message opened, but failed to update status in Google Sheets.");
+    }
+}
+
+document.getElementById("status").onchange = fetchContacts;
+window.onload = fetchContacts;
+</script>
+</body>
+</html>
