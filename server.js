@@ -164,17 +164,27 @@ async function getContacts(statusFilter = "PENDING") {
   const rows = res.data.values || [];
 
   const contacts = rows
-    .map((row, i) => ({
-      rowNumber: i + 2,
-      name: row[1] || "Student",
-      number: row[2] || "",
-      confidence: row[3] || "",
-      difficulty: row[4] || "",
-      detail: row[5] || "",
-      worry: row[6] || "",
-      status: row[8] || "PENDING"
-    }))
-    .filter(r => r.number && (statusFilter === "ALL" || r.status === statusFilter));
+    .map((row, i) => {
+      // ✅ AUTO-TREAT EMPTY STATUS AS PENDING
+      const rawStatus = (row[8] || "").toString().trim();
+      const normalizedStatus = rawStatus ? rawStatus.toUpperCase() : "PENDING";
+
+      return {
+        rowNumber: i + 2,
+        name: row[1] || "Student",
+        number: row[2] || "",
+        confidence: row[3] || "",
+        difficulty: row[4] || "",
+        detail: row[5] || "",
+        worry: row[6] || "",
+        status: normalizedStatus
+      };
+    })
+    .filter(r => {
+      if (!r.number) return false;
+      if (statusFilter === "ALL") return true;
+      return r.status === statusFilter;
+    });
 
   return Promise.all(
     contacts.map(async c => ({
