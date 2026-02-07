@@ -10,6 +10,8 @@ const { google } = require("googleapis");
 const app = express();
 app.use(cors());
 app.use(express.json());
+// Serve frontend (index.html)
+app.use(express.static(__dirname));
 
 const PORT = process.env.PORT || 5000;
 
@@ -229,4 +231,5 @@ app.post("/api/mark-sent", async (req, res) => {
 /* ================= START SERVER ================= */
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
+
 });
