@@ -1,4 +1,4 @@
-console.log("🔥 SERVER STARTED (FINAL AI-FIXED VERSION) 🔥");
+console.log("🔥 SERVER STARTED (FINAL STABLE VERSION) 🔥");
 
 require("dotenv").config({ path: "./ENV.env" });
 
@@ -10,8 +10,10 @@ const { google } = require("googleapis");
 const app = express();
 app.use(cors());
 app.use(express.json());
-// Serve frontend (index.html)
-app.use(express.static(__dirname));
+
+/* ================= FRONTEND SERVING ================= */
+// index.html MUST be inside ./public folder
+app.use(express.static(path.join(__dirname, "public")));
 
 const PORT = process.env.PORT || 5000;
 
@@ -50,7 +52,6 @@ const auth = new google.auth.GoogleAuth({
 
 /* ================= AI STEP GENERATOR ================= */
 async function generateSteps({ confidence, difficulty, detail, worry }) {
-  // Always keep fallback safety
   const fallback = `
 Focus on NCERT examples from ${difficulty}
 Practice ${detail} type questions daily
@@ -58,7 +59,6 @@ Revise formulas related to these chapters
 Solve 4–5 timed questions to build confidence
 `;
 
-  // If no key, AI is disabled
   if (!HUGGINGFACE_API_KEY) return fallback;
 
   try {
@@ -82,7 +82,6 @@ Main concern: ${worry}
 
 Write 3–4 VERY SPECIFIC action steps.
 Each step must directly reference the student's chapters or problem.
-Avoid generic advice.
 One step per line only.
 `,
           parameters: {
@@ -98,20 +97,15 @@ One step per line only.
     const data = await response.json();
 
     let text = "";
-
-    // HF may return array or object
     if (Array.isArray(data) && data[0]?.generated_text) {
       text = data[0].generated_text;
     } else if (data?.generated_text) {
       text = data.generated_text;
     }
 
-    if (text && text.trim().length > 20) {
-      return text.trim();
-    }
-
+    if (text && text.trim().length > 20) return text.trim();
     return fallback;
-  } catch (err) {
+  } catch {
     return fallback;
   }
 }
@@ -172,22 +166,15 @@ async function getContacts(statusFilter = "PENDING") {
   const contacts = rows
     .map((row, i) => ({
       rowNumber: i + 2,
-
       name: row[1] || "Student",
       number: row[2] || "",
-
       confidence: row[3] || "",
       difficulty: row[4] || "",
       detail: row[5] || "",
       worry: row[6] || "",
-
       status: row[8] || "PENDING"
     }))
-    .filter(
-      r =>
-        r.number &&
-        (statusFilter === "ALL" || r.status === statusFilter)
-    );
+    .filter(r => r.number && (statusFilter === "ALL" || r.status === statusFilter));
 
   return Promise.all(
     contacts.map(async c => ({
@@ -211,7 +198,6 @@ app.get("/api/contacts", async (req, res) => {
 app.post("/api/mark-sent", async (req, res) => {
   try {
     const { rowNumber } = req.body;
-
     const client = await auth.getClient();
     const sheets = google.sheets({ version: "v4", auth: client });
 
@@ -231,5 +217,4 @@ app.post("/api/mark-sent", async (req, res) => {
 /* ================= START SERVER ================= */
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
-
 });
