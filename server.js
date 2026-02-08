@@ -45,8 +45,10 @@ I Status
 */
 
 /* ================= GOOGLE AUTH ================= */
+
+
 const auth = new google.auth.GoogleAuth({
-  keyFile: path.join(__dirname, "whatsapp-sheets-access.json"),
+  credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON),
   scopes: ["https://www.googleapis.com/auth/spreadsheets"]
 });
 
@@ -228,3 +230,4 @@ app.post("/api/mark-sent", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
+
